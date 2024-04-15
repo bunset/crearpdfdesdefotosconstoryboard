@@ -1,0 +1,79 @@
+import UIKit
+import PhotosUI
+import PDFKit
+
+class ViewController: UIViewController, PHPickerViewControllerDelegate {
+    
+    var selectedImages: [UIImage] = []
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        dismiss(animated: true)
+
+        for result in results {
+            result.itemProvider.loadObject(ofClass: UIImage.self) { (object, error) in
+                if let image = object as? UIImage {
+                    self.selectedImages.append(image)
+                }
+            }
+        }
+    }
+
+    @IBAction func elegirfotosgaleria(_ sender: Any) {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = 0
+
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+    
+    @IBAction func crearpdf(_ sender: Any) {
+        let pdfDocument = PDFDocument()
+        for image in selectedImages {
+            if let pdfPage = PDFPage(image: image) {
+                pdfDocument.insert(pdfPage, at: pdfDocument.pageCount)
+            }
+        }
+        
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+
+        let pdfURL = documentsDirectory.appendingPathComponent("output.pdf")
+
+        let pdfRenderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
+        let pageCount = pdfDocument.pageCount
+        do {
+            try pdfRenderer.writePDF(to: pdfURL) { context in
+            for i in 0..<pageCount {
+                let pdfPage = pdfDocument.page(at: i)!
+                let image = pdfPage.thumbnail(of: CGSize(width: 612, height: 792), for: .artBox)
+                context.beginPage()
+                image.draw(in: CGRect(x: 0, y: 0, width: 612, height: 792))
+            }
+        }
+        
+        print("PDF generado: \(pdfURL)")
+        } catch {
+            print("Error al generar el PDF: \(error)")
+        }
+    }
+    
+    @IBAction func shareButtonTapped(_ sender: Any) {
+        // Obtener la URL del PDF generado
+        guard let pdfURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("output.pdf") else {
+            print("No se pudo obtener la URL del PDF generado.")
+            return
+        }
+        
+        // Crear un UIActivityViewController con la URL del PDF como actividad a compartir
+        let activityViewController = UIActivityViewController(activityItems: [pdfURL], applicationActivities: nil)
+        
+        // Presentar el UIActivityViewController
+        present(activityViewController, animated: true, completion: nil)
+    }
+
+
+}
+
